@@ -1,0 +1,770 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Snake</title>
+  <style>
+    :root {
+      --bg: #0b1020;
+      --panel: #111833;
+      --text: #e8ecff;
+      --muted: #a7b0d8;
+      --grid: #1a2550;
+      --snake: #7CFF6B;
+      --snakeHead: #B6FFAC;
+      --food: #ff4d6d;
+      --danger: #ffb703;
+    }
+
+    html, body {
+      height: 100%;
+      margin: 0;
+      background: radial-gradient(1200px 800px at 30% 20%, #151c3f, var(--bg));
+      color: var(--text);
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+    }
+
+    .wrap {
+      min-height: 100%;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+      box-sizing: border-box;
+    }
+
+    .card {
+      width: min(980px, 100%);
+      background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.03));
+      border: 1px solid rgba(255,255,255,0.10);
+      border-radius: 16px;
+      padding: 16px;
+      box-shadow: 0 16px 50px rgba(0,0,0,0.35);
+      backdrop-filter: blur(10px);
+    }
+
+    .top {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 12px;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+
+    h1 {
+      font-size: 16px;
+      margin: 0;
+      letter-spacing: 0.2px;
+      font-weight: 650;
+    }
+
+    .author {
+      color: var(--danger);
+      font-weight: 500;
+    }
+
+    .stats {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      justify-content: flex-end;
+      font-variant-numeric: tabular-nums;
+      flex-wrap: wrap;
+    }
+
+    .pill {
+      background: rgba(17,24,51,0.8);
+      border: 1px solid rgba(255,255,255,0.10);
+      border-radius: 999px;
+      padding: 6px 10px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .pill strong { color: var(--text); font-weight: 650; }
+
+    .row {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 12px;
+    }
+
+    canvas {
+      width: 100%;
+      max-width: 940px;
+      aspect-ratio: 30 / 18;
+      display: block;
+      margin: 0 auto;
+      background: linear-gradient(180deg, rgba(17,24,51,0.8), rgba(10,14,30,0.8));
+      border-radius: 14px;
+      border: 1px solid rgba(255,255,255,0.10);
+    }
+
+    .controls {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .actions {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      justify-content: flex-end;
+      flex-wrap: wrap;
+    }
+
+    .mode {
+      display: inline-flex;
+      border-radius: 12px;
+      overflow: hidden;
+      border: 1px solid rgba(255,255,255,0.14);
+      background: rgba(17,24,51,0.55);
+    }
+
+    .mode button {
+      border: 0;
+      border-radius: 0;
+      padding: 10px 10px;
+      background: transparent;
+    }
+
+    .mode button[aria-pressed="true"] {
+      background: rgba(255,255,255,0.08);
+      color: var(--text);
+    }
+
+    .mode button[aria-pressed="false"] {
+      color: var(--muted);
+    }
+
+    .hint {
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.35;
+    }
+
+    button {
+      appearance: none;
+      border: 1px solid rgba(255,255,255,0.14);
+      background: rgba(17,24,51,0.85);
+      color: var(--text);
+      border-radius: 12px;
+      padding: 10px 12px;
+      font-weight: 650;
+      cursor: pointer;
+    }
+
+    button:hover { border-color: rgba(255,255,255,0.22); }
+    button:active { transform: translateY(1px); }
+
+    .footer {
+      margin-top: 10px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .kbd {
+      display: inline-block;
+      padding: 2px 6px;
+      border-radius: 8px;
+      border: 1px solid rgba(255,255,255,0.14);
+      background: rgba(0,0,0,0.25);
+      color: var(--text);
+      font-variant-numeric: tabular-nums;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      button:active { transform: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <div class="top">
+        <h1>Snake (Nokia-style) - <span class="author">Waqas Bajwa</span></h1>
+        <div class="stats">
+          <div class="pill">Score: <strong id="score">0</strong></div>
+          <div class="pill">Best: <strong id="best">0</strong></div>
+          <div class="pill">Speed: <strong id="speed">7</strong></div>
+          <div class="pill" id="status" aria-live="polite">Ready</div>
+        </div>
+      </div>
+
+      <div class="row">
+        <canvas id="game" width="720" height="432"></canvas>
+
+        <div class="controls">
+          <div class="hint">
+            Move: <span class="kbd">↑</span> <span class="kbd">↓</span> <span class="kbd">←</span> <span class="kbd">→</span>
+            &nbsp;|&nbsp; Pause: <span class="kbd">Space</span>
+            &nbsp;|&nbsp; Restart: <span class="kbd">R</span>
+            <br />
+            Classic rules: self-collision ends the game (mode changes edges).
+          </div>
+          <div class="actions">
+            <div class="mode" role="group" aria-label="Edges">
+              <button id="edgeWalls" type="button" aria-pressed="true" title="Edges: hitting an edge ends the game">Walls</button>
+              <button id="edgeWrap" type="button" aria-pressed="false" title="Edges: wrap to the other side">Wrap</button>
+            </div>
+
+            <div class="mode" role="group" aria-label="Hurdles">
+              <button id="hurdlesOff" type="button" aria-pressed="true" title="No obstacles">Off</button>
+              <button id="hurdlesEasy" type="button" aria-pressed="false" title="A few obstacles">Easy</button>
+              <button id="hurdlesHard" type="button" aria-pressed="false" title="More obstacles">Hard</button>
+            </div>
+
+            <div class="mode" role="group" aria-label="Speed">
+              <button id="speedSlow" type="button" aria-pressed="false" title="Slower">Slow</button>
+              <button id="speedNormal" type="button" aria-pressed="true" title="Default">Normal</button>
+              <button id="speedFast" type="button" aria-pressed="false" title="Faster">Fast</button>
+            </div>
+            <button id="restart" type="button">Restart</button>
+          </div>
+        </div>
+
+        <div class="footer">
+          Tip: press an arrow key to start moving.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    /**
+     * Nokia-style Snake: discrete grid, fixed tick, no fancy effects.
+     */
+    const canvas = document.getElementById('game');
+    const ctx = canvas.getContext('2d');
+
+    const scoreEl = document.getElementById('score');
+    const bestEl = document.getElementById('best');
+    const speedEl = document.getElementById('speed');
+    const statusEl = document.getElementById('status');
+    const restartBtn = document.getElementById('restart');
+
+    const edgeWallsBtn = document.getElementById('edgeWalls');
+    const edgeWrapBtn = document.getElementById('edgeWrap');
+
+    const hurdlesOffBtn = document.getElementById('hurdlesOff');
+    const hurdlesEasyBtn = document.getElementById('hurdlesEasy');
+    const hurdlesHardBtn = document.getElementById('hurdlesHard');
+
+    const speedSlowBtn = document.getElementById('speedSlow');
+    const speedNormalBtn = document.getElementById('speedNormal');
+    const speedFastBtn = document.getElementById('speedFast');
+
+    // Landscape board (wider than tall)
+    const COLS = 30;
+    const ROWS = 18;
+    const CELL_PX = 24; // internal canvas resolution (30*24=720, 18*24=432)
+    canvas.width = COLS * CELL_PX;
+    canvas.height = ROWS * CELL_PX;
+    const CELL = CELL_PX;
+
+    const STORAGE_KEY = 'snake_best_score_v1';
+
+    const EdgeMode = {
+      Walls: 'walls',
+      Wrap: 'wrap',
+    };
+
+    const HurdlesMode = {
+      Off: 'off',
+      Easy: 'easy',
+      Hard: 'hard',
+    };
+
+    const SpeedPreset = {
+      Slow: 'slow',
+      Normal: 'normal',
+      Fast: 'fast',
+    };
+
+    const Direction = {
+      Up: { x: 0, y: -1, name: 'Up' },
+      Down: { x: 0, y: 1, name: 'Down' },
+      Left: { x: -1, y: 0, name: 'Left' },
+      Right: { x: 1, y: 0, name: 'Right' },
+    };
+
+    function clampInt(value, min, max) {
+      return Math.max(min, Math.min(max, value | 0));
+    }
+
+    function updateEdgeButtons() {
+      edgeWallsBtn.setAttribute('aria-pressed', String(state.edgeMode === EdgeMode.Walls));
+      edgeWrapBtn.setAttribute('aria-pressed', String(state.edgeMode === EdgeMode.Wrap));
+    }
+
+    function updateHurdlesButtons() {
+      hurdlesOffBtn.setAttribute('aria-pressed', String(state.hurdlesMode === HurdlesMode.Off));
+      hurdlesEasyBtn.setAttribute('aria-pressed', String(state.hurdlesMode === HurdlesMode.Easy));
+      hurdlesHardBtn.setAttribute('aria-pressed', String(state.hurdlesMode === HurdlesMode.Hard));
+    }
+
+    function updateSpeedButtons() {
+      speedSlowBtn.setAttribute('aria-pressed', String(state.speedPreset === SpeedPreset.Slow));
+      speedNormalBtn.setAttribute('aria-pressed', String(state.speedPreset === SpeedPreset.Normal));
+      speedFastBtn.setAttribute('aria-pressed', String(state.speedPreset === SpeedPreset.Fast));
+    }
+
+    function syncSettingsUI() {
+      updateEdgeButtons();
+      updateHurdlesButtons();
+      updateSpeedButtons();
+    }
+
+    function setEdgeMode(mode) {
+      state.edgeMode = mode;
+      syncSettingsUI();
+      resetGame();
+    }
+
+    function setHurdlesMode(mode) {
+      state.hurdlesMode = mode;
+      syncSettingsUI();
+      resetGame();
+    }
+
+    function setSpeedPreset(preset) {
+      state.speedPreset = preset;
+      speedEl.textContent = String(computeSpeedLevel());
+      syncSettingsUI();
+      scheduleNextTick(true);
+      draw();
+    }
+
+    function loadBestScore() {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      const parsed = Number(raw);
+      return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
+    }
+
+    function saveBestScore(best) {
+      localStorage.setItem(STORAGE_KEY, String(best));
+    }
+
+    function cellKey(p) {
+      return `${p.x},${p.y}`;
+    }
+
+    function randomEmptyCell(occupiedSet) {
+      // Avoid infinite loops for near-full grids.
+      const maxTries = COLS * ROWS * 2;
+      for (let i = 0; i < maxTries; i++) {
+        const p = { x: (Math.random() * COLS) | 0, y: (Math.random() * ROWS) | 0 };
+        if (!occupiedSet.has(cellKey(p))) return p;
+      }
+      // Fallback: scan for any empty cell.
+      for (let y = 0; y < ROWS; y++) {
+        for (let x = 0; x < COLS; x++) {
+          const k = `${x},${y}`;
+          if (!occupiedSet.has(k)) return { x, y };
+        }
+      }
+      return null;
+    }
+
+    function drawRoundedCell(x, y, color, radiusPx) {
+      const px = x * CELL;
+      const py = y * CELL;
+      const r = Math.min(radiusPx, CELL / 2);
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.moveTo(px + r, py);
+      ctx.arcTo(px + CELL, py, px + CELL, py + CELL, r);
+      ctx.arcTo(px + CELL, py + CELL, px, py + CELL, r);
+      ctx.arcTo(px, py + CELL, px, py, r);
+      ctx.arcTo(px, py, px + CELL, py, r);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    function drawGrid() {
+      // Subtle grid lines
+      ctx.save();
+      ctx.strokeStyle = 'rgba(255,255,255,0.07)';
+      ctx.lineWidth = 1;
+
+      for (let x = 1; x < COLS; x++) {
+        const px = x * CELL;
+        ctx.beginPath();
+        ctx.moveTo(px, 0);
+        ctx.lineTo(px, canvas.height);
+        ctx.stroke();
+      }
+
+      for (let y = 1; y < ROWS; y++) {
+        const py = y * CELL;
+        ctx.beginPath();
+        ctx.moveTo(0, py);
+        ctx.lineTo(canvas.width, py);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+
+    function draw() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Background vignette-ish overlay
+      ctx.save();
+      ctx.fillStyle = 'rgba(0,0,0,0.12)';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.restore();
+
+      drawGrid();
+
+      // Hurdles
+      if (state.hurdles && state.hurdles.length) {
+        for (const h of state.hurdles) {
+          drawRoundedCell(h.x, h.y, getCss('--danger'), 8);
+        }
+      }
+
+      // Food
+      if (state.food) {
+        drawRoundedCell(state.food.x, state.food.y, getCss('--food'), 10);
+      }
+
+      // Snake
+      for (let i = state.snake.length - 1; i >= 0; i--) {
+        const seg = state.snake[i];
+        const isHead = i === 0;
+        drawRoundedCell(seg.x, seg.y, isHead ? getCss('--snakeHead') : getCss('--snake'), isHead ? 12 : 9);
+      }
+
+      if (state.gameOver) {
+        drawOverlay('Game Over', 'Press R or Restart');
+      } else if (state.paused) {
+        drawOverlay('Paused', 'Press Space to resume');
+      } else if (!state.started) {
+        drawOverlay('Snake', 'Press an arrow key');
+      }
+    }
+
+    function drawOverlay(title, subtitle) {
+      ctx.save();
+      ctx.fillStyle = 'rgba(0,0,0,0.45)';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      ctx.fillStyle = 'rgba(255,255,255,0.95)';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.font = '700 42px system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif';
+      ctx.fillText(title, canvas.width / 2, canvas.height / 2 - 14);
+
+      ctx.fillStyle = 'rgba(255,255,255,0.78)';
+      ctx.font = '600 16px system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif';
+      ctx.fillText(subtitle, canvas.width / 2, canvas.height / 2 + 26);
+      ctx.restore();
+    }
+
+    function getCss(varName) {
+      return getComputedStyle(document.documentElement).getPropertyValue(varName).trim();
+    }
+
+    function setStatus(text, tone) {
+      statusEl.textContent = text;
+      statusEl.style.color = tone === 'warn' ? getCss('--danger') : '';
+    }
+
+    function computeSpeedLevel() {
+      // Speed level grows with score, capped.
+      // Base tick increases gradually as score grows.
+      const base = state.speedPreset === SpeedPreset.Slow ? 4
+        : state.speedPreset === SpeedPreset.Fast ? 10
+          : 7;
+      const level = base + Math.floor(state.score / 5);
+      return clampInt(level, 4, 20);
+    }
+
+    function tickIntervalMs() {
+      const speed = computeSpeedLevel();
+      // Convert speed (moves/sec) to ms.
+      return Math.round(1000 / speed);
+    }
+
+    function rebuildOccupiedSet(snake) {
+      const set = new Set();
+      for (const seg of snake) set.add(cellKey(seg));
+      return set;
+    }
+
+    function buildHurdles(occupiedSet, count) {
+      const hurdles = [];
+      for (let i = 0; i < count; i++) {
+        const p = randomEmptyCell(occupiedSet);
+        if (!p) break;
+        hurdles.push(p);
+        occupiedSet.add(cellKey(p));
+      }
+      return hurdles;
+    }
+
+    function resetGame() {
+      const midX = (COLS / 2) | 0;
+      const midY = (ROWS / 2) | 0;
+      const initial = [
+        { x: midX, y: midY },
+        { x: midX - 1, y: midY },
+        { x: midX - 2, y: midY },
+      ];
+
+      state.snake = initial;
+      state.dir = Direction.Right;
+      state.pendingDir = null;
+      state.started = false;
+      state.paused = false;
+      state.gameOver = false;
+      state.score = 0;
+
+      const snakeOccupied = rebuildOccupiedSet(state.snake);
+
+      if (state.hurdlesMode !== HurdlesMode.Off) {
+        const occupiedForHurdles = new Set(snakeOccupied);
+        // Keep a small safe lane in front of the starting head.
+        occupiedForHurdles.add(`${midX + 1},${midY}`);
+        occupiedForHurdles.add(`${midX + 2},${midY}`);
+        const hurdleCount = state.hurdlesMode === HurdlesMode.Hard ? 14 : 8;
+        state.hurdles = buildHurdles(occupiedForHurdles, hurdleCount);
+        state.hurdlesSet = new Set(state.hurdles.map(cellKey));
+      } else {
+        state.hurdles = [];
+        state.hurdlesSet = new Set();
+      }
+
+      const occupiedForFood = new Set(snakeOccupied);
+      for (const h of state.hurdles) occupiedForFood.add(cellKey(h));
+      state.food = randomEmptyCell(occupiedForFood);
+
+      scoreEl.textContent = String(state.score);
+      speedEl.textContent = String(computeSpeedLevel());
+      setStatus('Ready');
+
+      scheduleNextTick(true);
+      draw();
+    }
+
+    function setBestIfNeeded() {
+      if (state.score > state.best) {
+        state.best = state.score;
+        bestEl.textContent = String(state.best);
+        saveBestScore(state.best);
+      }
+    }
+
+    function isOpposite(a, b) {
+      return a && b && a.x === -b.x && a.y === -b.y;
+    }
+
+    function applyPendingDirection() {
+      if (!state.pendingDir) return;
+      if (!isOpposite(state.pendingDir, state.dir)) {
+        state.dir = state.pendingDir;
+      }
+      state.pendingDir = null;
+    }
+
+    function step() {
+      if (state.gameOver || state.paused) return;
+
+      if (!state.started) {
+        // Don’t move until the player presses an arrow.
+        return;
+      }
+
+      applyPendingDirection();
+
+      const head = state.snake[0];
+
+      let nextX = head.x + state.dir.x;
+      let nextY = head.y + state.dir.y;
+
+      if (state.edgeMode === EdgeMode.Wrap) {
+        nextX = (nextX + COLS) % COLS;
+        nextY = (nextY + ROWS) % ROWS;
+      } else {
+        // Wall collision
+        if (nextX < 0 || nextX >= COLS || nextY < 0 || nextY >= ROWS) {
+          state.gameOver = true;
+          setStatus('Game Over', 'warn');
+          setBestIfNeeded();
+          return;
+        }
+      }
+
+      const next = { x: nextX, y: nextY };
+
+      // Hurdle collision
+      if (state.hurdlesMode !== HurdlesMode.Off && state.hurdlesSet.has(cellKey(next))) {
+        state.gameOver = true;
+        setStatus('Game Over', 'warn');
+        setBestIfNeeded();
+        return;
+      }
+
+      // Self collision (tail exception handled by moving logic)
+      const snakeKeys = rebuildOccupiedSet(state.snake);
+
+      const willEat = state.food && next.x === state.food.x && next.y === state.food.y;
+
+      // If not eating, tail will move away; allow stepping into current tail.
+      if (!willEat) {
+        const tail = state.snake[state.snake.length - 1];
+        snakeKeys.delete(cellKey(tail));
+      }
+
+      if (snakeKeys.has(cellKey(next))) {
+        state.gameOver = true;
+        setStatus('Game Over', 'warn');
+        setBestIfNeeded();
+        return;
+      }
+
+      // Move head
+      state.snake.unshift(next);
+
+      if (willEat) {
+        state.score++;
+        scoreEl.textContent = String(state.score);
+        speedEl.textContent = String(computeSpeedLevel());
+
+        const occupied = rebuildOccupiedSet(state.snake);
+        if (state.hurdlesMode !== HurdlesMode.Off && state.hurdles && state.hurdles.length) {
+          for (const h of state.hurdles) occupied.add(cellKey(h));
+        }
+        state.food = randomEmptyCell(occupied);
+        if (!state.food) {
+          // Filled the grid.
+          state.gameOver = true;
+          setStatus('You Win', 'warn');
+          setBestIfNeeded();
+          return;
+        }
+      } else {
+        // Trim tail
+        state.snake.pop();
+      }
+
+      setStatus('Playing');
+    }
+
+    let tickTimer = null;
+    function scheduleNextTick(forceRestartTimer) {
+      const ms = tickIntervalMs();
+      if (!forceRestartTimer && state.lastTickMs === ms && tickTimer) {
+        return;
+      }
+      state.lastTickMs = ms;
+      if (tickTimer) {
+        clearInterval(tickTimer);
+        tickTimer = null;
+      }
+      tickTimer = setInterval(() => {
+        step();
+        draw();
+        // Auto-adjust speed as score changes
+        scheduleNextTick(false);
+      }, ms);
+    }
+
+    const state = {
+      snake: [],
+      dir: Direction.Right,
+      pendingDir: null,
+      food: null,
+      hurdles: [],
+      hurdlesSet: new Set(),
+      started: false,
+      paused: false,
+      gameOver: false,
+      score: 0,
+      best: loadBestScore(),
+      lastTickMs: 0,
+      edgeMode: EdgeMode.Walls,
+      hurdlesMode: HurdlesMode.Off,
+      speedPreset: SpeedPreset.Normal,
+    };
+
+    bestEl.textContent = String(state.best);
+
+    function handleDirection(dir) {
+      if (state.gameOver) return;
+      if (!state.started) {
+        state.started = true;
+        setStatus('Playing');
+      }
+      // Buffer one direction change per tick.
+      // Prevent immediate reversal.
+      const current = state.pendingDir ?? state.dir;
+      if (!isOpposite(dir, current)) {
+        state.pendingDir = dir;
+      }
+    }
+
+    window.addEventListener('keydown', (e) => {
+      const key = e.key;
+
+      if (key === 'ArrowUp') { e.preventDefault(); handleDirection(Direction.Up); return; }
+      if (key === 'ArrowDown') { e.preventDefault(); handleDirection(Direction.Down); return; }
+      if (key === 'ArrowLeft') { e.preventDefault(); handleDirection(Direction.Left); return; }
+      if (key === 'ArrowRight') { e.preventDefault(); handleDirection(Direction.Right); return; }
+
+      if (key === ' ' || key === 'Spacebar') {
+        e.preventDefault();
+        if (state.gameOver) return;
+        state.paused = !state.paused;
+        setStatus(state.paused ? 'Paused' : (state.started ? 'Playing' : 'Ready'));
+        draw();
+        return;
+      }
+
+      if (key === 'r' || key === 'R') {
+        e.preventDefault();
+        resetGame();
+      }
+    });
+
+    restartBtn.addEventListener('click', () => resetGame());
+
+    edgeWallsBtn.addEventListener('click', () => {
+      if (state.edgeMode !== EdgeMode.Walls) setEdgeMode(EdgeMode.Walls);
+    });
+
+    edgeWrapBtn.addEventListener('click', () => {
+      if (state.edgeMode !== EdgeMode.Wrap) setEdgeMode(EdgeMode.Wrap);
+    });
+
+    hurdlesOffBtn.addEventListener('click', () => {
+      if (state.hurdlesMode !== HurdlesMode.Off) setHurdlesMode(HurdlesMode.Off);
+    });
+
+    hurdlesEasyBtn.addEventListener('click', () => {
+      if (state.hurdlesMode !== HurdlesMode.Easy) setHurdlesMode(HurdlesMode.Easy);
+    });
+
+    hurdlesHardBtn.addEventListener('click', () => {
+      if (state.hurdlesMode !== HurdlesMode.Hard) setHurdlesMode(HurdlesMode.Hard);
+    });
+
+    speedSlowBtn.addEventListener('click', () => {
+      if (state.speedPreset !== SpeedPreset.Slow) setSpeedPreset(SpeedPreset.Slow);
+    });
+
+    speedNormalBtn.addEventListener('click', () => {
+      if (state.speedPreset !== SpeedPreset.Normal) setSpeedPreset(SpeedPreset.Normal);
+    });
+
+    speedFastBtn.addEventListener('click', () => {
+      if (state.speedPreset !== SpeedPreset.Fast) setSpeedPreset(SpeedPreset.Fast);
+    });
+
+    syncSettingsUI();
+    resetGame();
+  </script>
+</body>
+</html>
